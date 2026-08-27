@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepdesk.local/tests/golden/file-rag-v2.schema.json",
+  "title": "DeepDesk File RAG Regression Fixture v2",
+  "type": "object",
+  "required": ["index", "cases"],
+  "properties": {
+    "index": {
+      "type": "object",
+      "required": ["sourceText", "chunks", "embeddingInputs"],
+      "properties": {
+        "sourceText": {"type": "string"},
+        "embeddingInputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["content", "metadata"],
+            "properties": {
+              "content": {"type": "string"},
+              "metadata": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "question", "expected"],
+        "properties": {
+          "name": {"type": "string"},
+          "question": {"type": "string"},
+          "expected": {
+            "type": "object",
+            "required": ["topK", "finalSegments"],
+            "properties": {
+              "compressedQuery": {"type": "string"},
+              "expandedQueries": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "topK": {"type": "integer", "minimum": 1},
+              "finalSegments": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "finalContext": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
