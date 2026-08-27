@@ -104,12 +104,13 @@ $env:PLAYWRIGHT_CHANNEL="msedge"
 npm run e2e
 ```
 
-## 命名约定
+## 项目标识
 
-- 产品名：`DeepDesk`
-- Python distribution：`deepdesk-backend`
-- Frontend npm package：`deepdesk-web`
-- OpenTelemetry tracer：`deepdesk-backend`
-- Prometheus / tracing namespace：`deepdesk_*` / `deepdesk.*`
+- 产品：`DeepDesk`
+- Backend package：`deepdesk-backend`
+- Frontend package：`deepdesk-web`
+- OpenTelemetry service：`deepdesk-backend`
+- Prometheus namespace：`deepdesk_*`
+- Tracing attributes：`deepdesk.*`
 
-API 路由保持兼容，不因产品重命名而改变。
+前后端通过现有 API contract 与 Canonical SSE 协议协作，主要 Agent 路由保持稳定。
