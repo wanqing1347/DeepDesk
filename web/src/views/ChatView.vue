@@ -9,6 +9,7 @@ import { getSession } from '../api/session'
 import AgentModeSelector from '../components/composer/AgentModeSelector.vue'
 import ComposerBar from '../components/composer/ComposerBar.vue'
 import ComposerErrorNotice from '../components/composer/ComposerErrorNotice.vue'
+import AgentEmptyState from '../components/chat/AgentEmptyState.vue'
 import MessageList from '../components/chat/MessageList.vue'
 import SettingsDialog from '../components/layout/SettingsDialog.vue'
 import SidebarNav from '../components/layout/SidebarNav.vue'
@@ -454,6 +455,11 @@ async function stopGeneration() {
   }
 }
 
+function useSuggestedPrompt(question: string) {
+  if (isStreaming.value) return
+  draft.value = question
+}
+
 function sendRecommendation(question: string) {
   if (isStreaming.value) return
   draft.value = question
@@ -538,19 +544,23 @@ onMounted(() => void sessions.load())
       </header>
 
       <main v-if="isEmpty && !loadingConversation" class="min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto flex min-h-full w-full max-w-[900px] flex-col items-center justify-center px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-20 sm:pt-12">
-          <div class="mb-6 text-center">
-            <div class="font-[var(--font-display)] text-base font-semibold tracking-[-0.02em] text-[var(--ink-secondary)]">DeepDesk</div>
-            <h1 class="mt-2 font-[var(--font-display)] text-[clamp(1.7rem,5vw,2.15rem)] font-semibold tracking-[-0.035em] text-[var(--ink)]">
-              What can I help with?
-            </h1>
+        <div class="mx-auto flex min-h-full w-full max-w-[900px] flex-col items-center justify-center px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-8 sm:px-8 sm:pb-16 sm:pt-10">
+          <div class="mb-4 text-center">
+            <div class="font-[var(--font-display)] text-sm font-semibold tracking-[-0.02em] text-[var(--ink-secondary)]">DeepDesk</div>
           </div>
 
-          <div class="mb-4 max-w-full">
+          <div class="mb-5 max-w-full">
             <AgentModeSelector :model-value="currentMode" @update:model-value="changeMode" />
           </div>
 
-          <div v-if="composerError" class="mb-3 w-full max-w-[800px] px-2">
+          <AgentEmptyState
+            :mode="currentMode"
+            :attachment="current?.attachment || null"
+            @suggestion="useSuggestedPrompt"
+            @file="attachFile"
+          />
+
+          <div v-if="composerError" class="mb-3 mt-5 w-full max-w-[800px] px-2">
             <ComposerErrorNotice
               :error="composerError"
               :action-label="conversation.loadError ? 'Retry history' : undefined"
@@ -560,6 +570,7 @@ onMounted(() => void sessions.load())
           </div>
           <ComposerBar
             v-model="draft"
+            class="mt-5"
             :mode="currentMode"
             :attachment="current?.attachment || null"
             :streaming="isStreaming"

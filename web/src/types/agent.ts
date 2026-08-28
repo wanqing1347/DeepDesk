@@ -71,4 +71,8 @@ export interface AgentDefinition {
   label: string
   shortLabel: string
   description: string
+  headline: string
+  placeholder: string
+  suggestions: string[]
+  capabilities: string[]
 }

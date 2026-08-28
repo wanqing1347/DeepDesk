@@ -53,6 +53,34 @@ test.beforeEach(async ({ page }) => {
   await mockHistory(page)
 })
 
+test('Agent modes visibly differentiate the empty workspace before a message is sent', async ({ page }) => {
+  await openHome(page)
+
+  const composer = page.getByRole('textbox', { name: 'Message' })
+  await expect(composer).toHaveAttribute('placeholder', /Ask a question, explore an idea/i)
+  await expect(page.getByText('Direct answers', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Deep Research', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Research a complex question' })).toBeVisible()
+  await expect(page.getByText('Multi-source research', { exact: true })).toBeVisible()
+  await expect(composer).toHaveAttribute('placeholder', /researched, compared, or verified/i)
+
+  await page.getByRole('button', { name: 'File', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Work with a file' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Drop a file here or browse/i })).toBeVisible()
+  await expect(composer).toHaveAttribute('placeholder', /attached file/i)
+
+  await page.getByRole('button', { name: 'Skills', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Put tools to work' })).toBeVisible()
+  await expect(page.getByText('Restricted Bash', { exact: true })).toBeVisible()
+  await expect(composer).toHaveAttribute('placeholder', /choose the right tools/i)
+
+  await page.getByRole('button', { name: 'PPT', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Build a presentation' })).toBeVisible()
+  await expect(page.getByText('Continue and modify', { exact: true })).toBeVisible()
+  await expect(composer).toHaveAttribute('placeholder', /topic, audience, slide count/i)
+})
+
 test('Chat smoke: Enter sends and the canonical SSE sequence reaches complete UI', async ({ page }) => {
   await mockChat(page, [
     { type: 'thinking', content: 'Inspecting the request…' },

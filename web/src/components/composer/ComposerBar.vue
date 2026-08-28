@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ArrowUp, Paperclip, Square } from 'lucide-vue-next'
 import { computed, nextTick, ref, watch } from 'vue'
+import { AGENT_BY_ID } from '../../config/agents'
 import type { AgentMode, FileAttachment } from '../../types/agent'
 import AgentModeSelector from './AgentModeSelector.vue'
 import FileAttachmentBar from './FileAttachmentBar.vue'
@@ -28,6 +29,8 @@ const textarea = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
 const composing = ref(false)
+
+const placeholder = computed(() => AGENT_BY_ID[props.mode].placeholder)
 
 const canSend = computed(() => {
   if (
@@ -102,7 +105,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
         :value="modelValue"
         rows="1"
         :disabled="disabled"
-        placeholder="Ask anything…"
+        :placeholder="placeholder"
         class="block max-h-[220px] min-h-[68px] w-full resize-none bg-transparent px-4 pb-1.5 pt-3.5 text-base leading-7 text-[var(--ink)] placeholder:text-[var(--ink-faint)] focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[64px]"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
         @keydown="onKeydown"
