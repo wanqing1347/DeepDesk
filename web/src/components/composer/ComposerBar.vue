@@ -137,6 +137,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
           <AgentModeSelector
             v-if="!hideModeSelector"
             :model-value="mode"
+            :disabled="disabled || streaming"
             compact
             @update:model-value="emit('update:mode', $event)"
           />

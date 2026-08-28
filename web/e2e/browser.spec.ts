@@ -81,6 +81,74 @@ test('Agent modes visibly differentiate the empty workspace before a message is 
   await expect(composer).toHaveAttribute('placeholder', /topic, audience, slide count/i)
 })
 
+test('switching mode after a completed turn starts a fresh conversation and reload restores that mode', async ({ page }) => {
+  let chatConversationId = ''
+  let researchConversationId = ''
+
+  await page.route('**/api/agent/chat/stream**', async (route) => {
+    chatConversationId = new URL(route.request().url()).searchParams.get('conversationId') || ''
+    await route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+      body: sse([{ type: 'text', content: 'Chat conversation answer.' }, { type: 'complete' }]),
+    })
+  })
+  await page.route('**/api/agent/deep/stream**', async (route) => {
+    researchConversationId = new URL(route.request().url()).searchParams.get('conversationId') || ''
+    await route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+      body: sse([{ type: 'text', content: 'Research conversation answer.' }, { type: 'complete' }]),
+    })
+  })
+
+  await openHome(page)
+  await send(page, 'Start in Chat')
+  await expect(page.getByText('Chat conversation answer.', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/c\/.+/)
+
+  await page.getByRole('button', { name: 'Research', exact: true }).click()
+
+  await expect(page).toHaveURL('/')
+  await expect(page.getByRole('heading', { name: 'Research a complex question' })).toBeVisible()
+  await expect(page.getByText('Chat conversation answer.', { exact: true })).toBeHidden()
+
+  await send(page, 'Continue as research')
+  await expect(page.getByText('Research conversation answer.', { exact: true })).toBeVisible()
+  expect(chatConversationId).not.toBe('')
+  expect(researchConversationId).not.toBe('')
+  expect(researchConversationId).not.toBe(chatConversationId)
+
+  await page.route(`**/api/session/${researchConversationId}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          conversationId: researchConversationId,
+          agentType: 'plan-execute',
+          fileid: null,
+          messages: [
+            {
+              id: 21,
+              question: 'Continue as research',
+              answer: 'Research conversation answer.',
+              createTime: '2026-08-28T21:00:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await page.reload()
+
+  await expect(page.getByRole('button', { name: 'Research', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Research conversation answer.', { exact: true })).toBeVisible()
+})
+
 test('Chat smoke: Enter sends and the canonical SSE sequence reaches complete UI', async ({ page }) => {
   await mockChat(page, [
     { type: 'thinking', content: 'Inspecting the request…' },

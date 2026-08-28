@@ -80,9 +80,18 @@ export const useConversationStore = defineStore('conversation', {
       this.loadError = ''
       return conversationId
     },
-    setMode(mode: AgentMode) {
-      if (!this.current) this.create(mode)
-      else this.current.mode = mode
+    switchMode(mode: AgentMode): { conversationId: string; created: boolean } {
+      if (!this.current) {
+        return { conversationId: this.create(mode), created: true }
+      }
+      if (this.current.mode === mode) {
+        return { conversationId: this.current.id, created: false }
+      }
+      if (this.current.messages.length > 0) {
+        return { conversationId: this.create(mode), created: true }
+      }
+      this.current.mode = mode
+      return { conversationId: this.current.id, created: false }
     },
     load(detail: SessionDetail) {
       const mode = modeFromBackend(detail.agentType)

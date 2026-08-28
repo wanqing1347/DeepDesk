@@ -224,13 +224,24 @@ async function removeSession(id: string) {
   }
 }
 
-function changeMode(mode: AgentMode) {
+async function changeMode(mode: AgentMode): Promise<boolean> {
   composerError.value = null
-  if (current.value?.attachment && mode !== 'file' && mode !== 'skills') {
+  if (isStreaming.value || loadingConversation.value) return false
+  if (mode === currentMode.value) return true
+
+  const hasMessages = Boolean(current.value?.messages.length)
+  if (!hasMessages && current.value?.attachment && mode !== 'file' && mode !== 'skills') {
     showComposerError('Remove the attached file before switching to this mode.')
-    return
+    return false
   }
-  conversation.setMode(mode)
+
+  const { created } = conversation.switchMode(mode)
+  if (created) {
+    retryUploadFile = null
+    resetScrollFollow()
+    if (route.path !== '/') await router.push('/')
+  }
+  return true
 }
 
 async function attachFile(file: File) {
@@ -273,7 +284,10 @@ async function attachFile(file: File) {
   }
 
   retryUploadFile = null
-  if (currentMode.value !== 'skills') conversation.setMode('file')
+  if (currentMode.value !== 'file' && currentMode.value !== 'skills') {
+    const changed = await changeMode('file')
+    if (!changed) return
+  }
   conversation.setAttachment({
     name: file.name,
     size: file.size,

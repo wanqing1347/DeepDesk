@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import {
+  Bot,
+  FileText,
   Menu,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   PenLine,
+  Presentation,
   Settings,
+  Telescope,
   Trash2,
   X,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { modeFromBackend } from '../../config/agents'
+import type { AgentMode } from '../../types/agent'
 import type { SessionListItem } from '../../types/api'
 
 const props = defineProps<{
@@ -56,8 +62,20 @@ const groups = computed<SessionGroup[]>(() => {
     .map((label) => ({ label, items: buckets.get(label)! }))
 })
 
+const sessionIcons: Record<AgentMode, typeof MessageSquare> = {
+  chat: MessageSquare,
+  research: Telescope,
+  file: FileText,
+  skills: Bot,
+  ppt: Presentation,
+}
+
 function title(item: SessionListItem): string {
   return item.question?.trim() || 'Untitled conversation'
+}
+
+function sessionIcon(item: SessionListItem) {
+  return sessionIcons[modeFromBackend(item.agentType)]
 }
 </script>
 
@@ -139,7 +157,11 @@ function title(item: SessionListItem): string {
               :aria-current="session.conversationId === currentId ? 'page' : undefined"
               @click="emit('select', session.conversationId)"
             >
-              <MessageSquare class="size-3.5 shrink-0 text-[var(--ink-faint)]" aria-hidden="true" />
+              <component
+                :is="sessionIcon(session)"
+                class="size-3.5 shrink-0 text-[var(--ink-faint)]"
+                aria-hidden="true"
+              />
               <span class="truncate pr-7">{{ title(session) }}</span>
             </button>
             <button

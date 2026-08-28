@@ -2,9 +2,60 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useConversationStore } from './conversation'
 
-describe('conversation retry behavior', () => {
+describe('conversation store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+  })
+
+  it('keeps the same empty conversation when switching modes', () => {
+    const store = useConversationStore()
+    store.create('chat', 'conversation-empty')
+
+    const result = store.switchMode('research')
+
+    expect(result).toEqual({ conversationId: 'conversation-empty', created: false })
+    expect(store.current).toMatchObject({
+      id: 'conversation-empty',
+      mode: 'research',
+      messages: [],
+      attachment: null,
+    })
+  })
+
+  it('creates a fresh conversation when switching modes after messages exist', () => {
+    const store = useConversationStore()
+    store.create('chat', 'conversation-chat')
+    const { assistant } = store.addTurn('Compare two approaches')
+    store.applyEvent(assistant.id, { type: 'complete' })
+
+    const result = store.switchMode('ppt')
+
+    expect(result.created).toBe(true)
+    expect(result.conversationId).not.toBe('conversation-chat')
+    expect(store.current).toMatchObject({
+      id: result.conversationId,
+      mode: 'ppt',
+      messages: [],
+      attachment: null,
+    })
+  })
+
+  it.each([
+    ['plan-execute', 'research'],
+    ['pptx', 'ppt'],
+  ] as const)('restores %s history as %s mode', (agentType, expectedMode) => {
+    const store = useConversationStore()
+    store.load({
+      conversationId: `conversation-${expectedMode}`,
+      agentType,
+      messages: [{ id: 11, question: 'Persisted question', answer: 'Persisted answer' }],
+    })
+
+    expect(store.current?.mode).toBe(expectedMode)
+    expect(store.current?.messages[1]).toMatchObject({
+      role: 'assistant',
+      agentMode: expectedMode,
+    })
   })
 
   it('reuses the original user question without inserting a duplicate user message', () => {

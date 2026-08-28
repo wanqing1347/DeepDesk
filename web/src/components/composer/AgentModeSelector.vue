@@ -3,7 +3,7 @@ import { Bot, FileText, MessageCircle, Presentation, Telescope } from 'lucide-vu
 import { AGENTS } from '../../config/agents'
 import type { AgentMode } from '../../types/agent'
 
-const props = defineProps<{ modelValue: AgentMode; compact?: boolean }>()
+const props = defineProps<{ modelValue: AgentMode; compact?: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [mode: AgentMode] }>()
 
 const icons = {
@@ -26,7 +26,8 @@ const icons = {
       :key="agent.id"
       type="button"
       :aria-pressed="props.modelValue === agent.id"
-      class="relative inline-flex h-12 shrink-0 items-center gap-1.5 rounded-lg px-3 text-base transition-colors focus-visible:outline-offset-1 sm:h-8 sm:px-2.5 sm:text-sm"
+      :disabled="props.disabled"
+      class="relative inline-flex h-12 shrink-0 items-center gap-1.5 rounded-lg px-3 text-base transition-colors focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-45 sm:h-8 sm:px-2.5 sm:text-sm"
       :class="
         props.modelValue === agent.id
           ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
