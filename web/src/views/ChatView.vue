@@ -6,7 +6,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../api/client'
 import { deleteFile, getFileInfo, uploadFile } from '../api/file'
 import { getSession } from '../api/session'
-import AgentModeSelector from '../components/composer/AgentModeSelector.vue'
 import ComposerBar from '../components/composer/ComposerBar.vue'
 import ComposerErrorNotice from '../components/composer/ComposerErrorNotice.vue'
 import AgentEmptyState from '../components/chat/AgentEmptyState.vue'
@@ -469,11 +468,6 @@ async function stopGeneration() {
   }
 }
 
-function useSuggestedPrompt(question: string) {
-  if (isStreaming.value) return
-  draft.value = question
-}
-
 function sendRecommendation(question: string) {
   if (isStreaming.value) return
   draft.value = question
@@ -558,23 +552,10 @@ onMounted(() => void sessions.load())
       </header>
 
       <main v-if="isEmpty && !loadingConversation" class="min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto flex min-h-full w-full max-w-[900px] flex-col items-center justify-center px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-8 sm:px-8 sm:pb-16 sm:pt-10">
-          <div class="mb-4 text-center">
-            <div class="font-[var(--font-display)] text-sm font-semibold tracking-[-0.02em] text-[var(--ink-secondary)]">DeepDesk</div>
-          </div>
+        <div class="mx-auto flex min-h-full w-full max-w-[900px] flex-col items-center justify-center px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pb-12 sm:pt-8">
+          <AgentEmptyState :mode="currentMode" />
 
-          <div class="mb-5 max-w-full">
-            <AgentModeSelector :model-value="currentMode" @update:model-value="changeMode" />
-          </div>
-
-          <AgentEmptyState
-            :mode="currentMode"
-            :attachment="current?.attachment || null"
-            @suggestion="useSuggestedPrompt"
-            @file="attachFile"
-          />
-
-          <div v-if="composerError" class="mb-3 mt-5 w-full max-w-[800px] px-2">
+          <div v-if="composerError" class="mb-3 mt-4 w-full max-w-[800px] px-2">
             <ComposerErrorNotice
               :error="composerError"
               :action-label="conversation.loadError ? 'Retry history' : undefined"
@@ -584,11 +565,10 @@ onMounted(() => void sessions.load())
           </div>
           <ComposerBar
             v-model="draft"
-            class="mt-5"
+            class="mt-4"
             :mode="currentMode"
             :attachment="current?.attachment || null"
             :streaming="isStreaming"
-            hide-mode-selector
             @update:mode="changeMode"
             @send="sendMessage"
             @stop="stopGeneration"

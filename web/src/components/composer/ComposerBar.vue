@@ -31,6 +31,7 @@ const dragging = ref(false)
 const composing = ref(false)
 
 const placeholder = computed(() => AGENT_BY_ID[props.mode].placeholder)
+const fileEnabled = computed(() => props.mode === 'file' || props.mode === 'skills')
 
 const canSend = computed(() => {
   if (
@@ -56,12 +57,22 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function acceptFile(file?: File) {
-  if (!file) return
+  if (!fileEnabled.value || !file) return
   dragging.value = false
   emit('file', file)
 }
 
+function onDragEnter() {
+  if (fileEnabled.value) dragging.value = true
+}
+
+function onDragLeave() {
+  dragging.value = false
+}
+
 function onDrop(event: DragEvent) {
+  dragging.value = false
+  if (!fileEnabled.value) return
   event.preventDefault()
   acceptFile(event.dataTransfer?.files?.[0])
 }
@@ -74,9 +85,9 @@ defineExpose({ focus: () => textarea.value?.focus() })
 <template>
   <div
     class="relative mx-auto w-full max-w-[800px]"
-    @dragenter.prevent="dragging = true"
-    @dragover.prevent="dragging = true"
-    @dragleave.prevent="dragging = false"
+    @dragenter.prevent="onDragEnter"
+    @dragover.prevent="onDragEnter"
+    @dragleave.prevent="onDragLeave"
     @drop="onDrop"
   >
     <div
@@ -116,6 +127,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
       <div class="flex min-w-0 items-end justify-between gap-2 px-2.5 pb-2">
         <div class="flex min-w-0 flex-1 items-center gap-1">
           <input
+            v-if="fileEnabled"
             ref="fileInput"
             class="sr-only"
             type="file"
@@ -125,6 +137,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
             @change="acceptFile(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''"
           />
           <button
+            v-if="fileEnabled"
             type="button"
             class="relative inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-[var(--ink-faint)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] disabled:opacity-40 sm:size-8"
             aria-label="Attach file"
