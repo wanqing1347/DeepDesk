@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..ppt.domain import PptStatus
@@ -52,6 +52,24 @@ class PptRepository:
                 )
             )
             return [self._detach(session, item) for item in rows]
+
+    def list_all(self) -> list[AiPptInst]:
+        with self._session_factory() as session:
+            rows = list(
+                session.scalars(
+                    select(AiPptInst).order_by(AiPptInst.create_time.desc(), AiPptInst.id.desc())
+                )
+            )
+            return [self._detach(session, item) for item in rows]
+
+    def delete(self, inst_id: int) -> bool:
+        with self._session_factory() as session:
+            result = session.execute(delete(AiPptInst).where(AiPptInst.id == inst_id))
+            if result.rowcount == 0:
+                session.rollback()
+                return False
+            session.commit()
+            return True
 
     def get_completed(self, conversation_id: str) -> list[AiPptInst]:
         with self._session_factory() as session:

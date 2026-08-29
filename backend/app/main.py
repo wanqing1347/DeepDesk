@@ -31,6 +31,7 @@ from .providers.llm import OpenAICompatibleClient
 from .providers.multimodal import OpenAICompatibleImageDescriber
 from .rate_limit import RateLimitMiddleware, build_rate_limiter
 from .routers.file import build_file_router
+from .routers.ppt import build_ppt_router
 from .routers.session import build_session_router
 from .schemas import AgentEvent, StopResponse
 from .sse import as_sse
@@ -96,6 +97,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     file_content_tool: FileContentTool | None = None
     file_agent: FileAgent | None = None
     ppt_agent: PptBuilderAgent | None = None
+    ppt_repository: PptRepository | None = None
     object_store: MinioObjectStore | None = None
     if database is not None:
         file_rag_service = build_file_rag_service(
@@ -186,6 +188,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.state.file_rag_service = file_rag_service
     app.state.object_store = object_store
     app.state.file_agent = file_agent
+    app.state.ppt_repository = ppt_repository
     app.state.ppt_agent = ppt_agent
     app.state.skills_agent = skills_agent
 
@@ -229,6 +232,14 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             )
         return file_service
 
+    def get_ppt_repository() -> PptRepository:
+        if ppt_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="PPT持久化未启用，请设置 PERSISTENCE_MODE=database",
+            )
+        return ppt_repository
+
     async def register_task(conversation_id: str) -> AgentEvent | None:
         try:
             acquired = await tasks.register_current(conversation_id)
@@ -259,6 +270,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
 
     app.include_router(build_session_router(database_session))
     app.include_router(build_file_router(get_file_service))
+    app.include_router(build_ppt_router(get_ppt_repository))
 
     @app.get("/health")
     async def health() -> dict[str, str]:

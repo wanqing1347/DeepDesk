@@ -37,6 +37,23 @@ class FileInfoVO(ApiModel):
     embed: int | None = 0
 
 
+class PptInfoVO(ApiModel):
+    id: int
+    conversation_id: str | None = Field(default=None, alias="conversationId")
+    template_code: str | None = Field(default=None, alias="templateCode")
+    status: str = "INIT"
+    query: str | None = None
+    file_url: str | None = Field(default=None, alias="fileUrl")
+    error_msg: str | None = Field(default=None, alias="errorMsg")
+    create_time: datetime | None = Field(default=None, alias="createTime")
+    update_time: datetime | None = Field(default=None, alias="updateTime")
+
+
+class PptListVO(ApiModel):
+    count: int
+    presentations: list[PptInfoVO]
+
+
 class FileContentVO(ApiModel):
     content: str
     length: int

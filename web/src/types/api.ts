@@ -64,6 +64,23 @@ export interface FileContent {
   length: number
 }
 
+export interface PresentationInfo {
+  id: number
+  conversationId?: string | null
+  templateCode?: string | null
+  status: string
+  query?: string | null
+  fileUrl?: string | null
+  errorMsg?: string | null
+  createTime?: string | null
+  updateTime?: string | null
+}
+
+export interface PresentationList {
+  count: number
+  presentations: PresentationInfo[]
+}
+
 export interface StopResponse {
   success: boolean
   message: string

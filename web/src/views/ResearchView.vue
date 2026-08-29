@@ -70,7 +70,11 @@ async function removeSession(conversationId: string) {
 
 async function openWorkspace(section: WorkspaceSection) {
   settings.setMobileSidebar(false)
-  if (section === 'chats') await startNewChat()
+  if (section === 'chats') {
+    await startNewChat()
+    return
+  }
+  if (section === 'presentations') await router.push('/presentations')
 }
 
 function openSettings(fromMobile = false) {

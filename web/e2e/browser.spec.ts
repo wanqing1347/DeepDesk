@@ -556,6 +556,147 @@ test('Research history is a real workspace route and restores final report with 
   )
 })
 
+test('Presentations workspace lists real PPT assets and supports open, download, continue editing, and delete', async ({ page }) => {
+  await page.route('**/api/session/list**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          pageNum: 1,
+          pageSize: 100,
+          total: 2,
+          records: [
+            {
+              conversationId: 'ppt-history',
+              agentType: 'pptx',
+              question: 'AI interview walkthrough',
+              answer: 'Deck ready',
+              updateTime: '2026-08-29T09:30:00',
+            },
+            {
+              conversationId: 'ppt-failed',
+              agentType: 'pptx',
+              question: 'Failed architecture deck',
+              answer: null,
+              updateTime: '2026-08-29T09:10:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await page.route('**/api/ppt/list', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          count: 2,
+          presentations: [
+            {
+              id: 7,
+              conversationId: 'ppt-history',
+              status: 'SUCCESS',
+              query: 'AI interview walkthrough',
+              fileUrl: 'https://files.example/ppt/ppt-history/ppt_7_demo.pptx',
+              createTime: '2026-08-29T09:20:00',
+              updateTime: '2026-08-29T09:30:00',
+            },
+            {
+              id: 8,
+              conversationId: 'ppt-failed',
+              status: 'FAILED',
+              query: 'Failed architecture deck',
+              errorMsg: 'render failed',
+              createTime: '2026-08-29T09:00:00',
+              updateTime: '2026-08-29T09:10:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await page.route('**/api/session/ppt-history', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          conversationId: 'ppt-history',
+          agentType: 'pptx',
+          fileid: null,
+          messages: [
+            {
+              id: 71,
+              question: 'AI interview walkthrough',
+              answer: 'PPT已生成：https://files.example/ppt/ppt-history/ppt_7_demo.pptx',
+              thinking: '开始创建新的PPT...\n正在渲染PPT...\n✅ PPT渲染完成',
+              createTime: '2026-08-29T09:30:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  let deletedId = ''
+  await page.route('**/api/ppt/8', async (route) => {
+    deletedId = route.request().url().split('/').pop() || ''
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 200, message: 'PPT删除成功', data: null }),
+    })
+  })
+
+  await openHome(page)
+  const workspace = page.getByRole('navigation', { name: 'Workspace' })
+  await workspace.getByRole('button', { name: 'Presentations', exact: true }).click()
+
+  await expect(page).toHaveURL('/presentations')
+  await expect(page.getByRole('heading', { name: 'Presentations' })).toBeVisible()
+
+  const readyCard = page.getByRole('article').filter({ hasText: 'AI interview walkthrough' })
+  const failedCard = page.getByRole('article').filter({ hasText: 'Failed architecture deck' })
+  await expect(readyCard).toBeVisible()
+  await expect(failedCard).toBeVisible()
+  await expect(readyCard.getByText('Ready', { exact: true })).toBeVisible()
+  await expect(failedCard.getByText('Failed', { exact: true })).toBeVisible()
+  await expect(failedCard.getByText('render failed', { exact: true })).toBeVisible()
+
+  const open = readyCard.getByRole('link', { name: 'Open', exact: true })
+  await expect(open).toHaveAttribute('href', 'https://files.example/ppt/ppt-history/ppt_7_demo.pptx')
+  await expect(open).toHaveAttribute('target', '_blank')
+  const download = readyCard.getByRole('link', { name: 'Download', exact: true })
+  await expect(download).toHaveAttribute('href', 'https://files.example/ppt/ppt-history/ppt_7_demo.pptx')
+  await expect(download).toHaveAttribute('download', 'ppt_7_demo.pptx')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await failedCard.getByRole('button', { name: 'Delete presentation: Failed architecture deck' }).click()
+  await expect(failedCard).toBeHidden()
+  expect(deletedId).toBe('8')
+
+  await readyCard.getByRole('button', { name: 'Continue editing' }).click()
+  await expect(page).toHaveURL('/c/ppt-history')
+  await expect(
+    page.getByRole('group', { name: 'Agent mode' }).getByRole('button', { name: 'PPT', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByLabel('Presentation file').getByText('Presentation ready', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open PPT' })).toHaveAttribute(
+    'href',
+    'https://files.example/ppt/ppt-history/ppt_7_demo.pptx',
+  )
+})
+
 const responsiveCases = [
   { name: '1440px', width: 1440, height: 900 },
   { name: '1024px', width: 1024, height: 800 },

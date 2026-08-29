@@ -205,7 +205,11 @@ async function newChat() {
 
 async function openWorkspace(section: WorkspaceSection) {
   settings.setMobileSidebar(false)
-  if (section === 'research' && route.path !== '/research') await router.push('/research')
+  if (section === 'research' && route.path !== '/research') {
+    await router.push('/research')
+    return
+  }
+  if (section === 'presentations' && route.path !== '/presentations') await router.push('/presentations')
 }
 
 async function selectSession(id: string) {
