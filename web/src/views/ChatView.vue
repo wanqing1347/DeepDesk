@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../api/client'
-import { deleteFile, getFileInfo, uploadFile } from '../api/file'
+import { getFileInfo, uploadFile } from '../api/file'
 import { getSession } from '../api/session'
 import ComposerBar from '../components/composer/ComposerBar.vue'
 import ComposerErrorNotice from '../components/composer/ComposerErrorNotice.vue'
@@ -18,6 +18,7 @@ import { useConversationStore } from '../stores/conversation'
 import { useSessionStore } from '../stores/session'
 import { useSettingsStore } from '../stores/settings'
 import type { AgentMode, AssistantMessage, StreamError } from '../types/agent'
+import type { FileInfo } from '../types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -246,10 +247,11 @@ async function changeMode(mode: AgentMode): Promise<boolean> {
 async function attachFile(file: File) {
   composerError.value = null
   if (isStreaming.value) return
-  if (current.value?.attachment) {
-    showComposerError('Only one active file is supported. Remove the current file first.')
+  if (current.value?.attachment?.status === 'uploading' || current.value?.attachment?.status === 'processing') {
+    showComposerError('Wait for the current file to finish before replacing it.')
     return
   }
+  if (current.value?.attachment) conversation.setAttachment(null)
 
   const extension = file.name.split('.').pop()?.toLowerCase() || ''
   const allowed = new Set(['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])
@@ -340,6 +342,31 @@ async function retryAttachmentUpload() {
   await attachFile(file)
 }
 
+function selectExistingFile(info: FileInfo) {
+  composerError.value = null
+  if (isStreaming.value || loadingConversation.value) return
+  if (currentMode.value !== 'file' && currentMode.value !== 'skills') return
+  if (current.value?.attachment?.status === 'uploading' || current.value?.attachment?.status === 'processing') {
+    showComposerError('Wait for the current file to finish before replacing it.')
+    return
+  }
+  if (info.status.trim().toUpperCase() !== 'SUCCESS') {
+    showComposerError('This file is not ready to use yet.')
+    return
+  }
+
+  retryUploadFile = null
+  conversation.setAttachment({
+    fileId: info.fileId,
+    name: info.fileName,
+    size: info.fileSize ?? undefined,
+    type: info.fileType ?? undefined,
+    status: 'ready',
+    progress: 100,
+    retryable: false,
+  })
+}
+
 async function removeAttachment() {
   composerError.value = null
   const attachment = current.value?.attachment
@@ -354,15 +381,7 @@ async function removeAttachment() {
     showComposerError('The file is already being processed. Wait for processing to finish before removing it.')
     return
   }
-  if (attachment.fileId) {
-    try {
-      await deleteFile(attachment.fileId)
-    } catch (error) {
-      const failure = uiError(error, 'Could not delete the file.')
-      composerError.value = { ...failure, message: `Could not delete the file: ${failure.message}` }
-      return
-    }
-  }
+
   retryUploadFile = null
   conversation.setAttachment(null)
 }
@@ -573,6 +592,7 @@ onMounted(() => void sessions.load())
             @send="sendMessage"
             @stop="stopGeneration"
             @file="attachFile"
+            @select-file="selectExistingFile"
             @retry-file="retryAttachmentUpload"
             @remove-file="removeAttachment"
           />
@@ -630,6 +650,7 @@ onMounted(() => void sessions.load())
             @send="sendMessage"
             @stop="stopGeneration"
             @file="attachFile"
+            @select-file="selectExistingFile"
             @retry-file="retryAttachmentUpload"
             @remove-file="removeAttachment"
           />

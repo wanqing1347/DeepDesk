@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ArrowUp, Paperclip, Square } from 'lucide-vue-next'
+import { ArrowUp, Square } from 'lucide-vue-next'
 import { computed, nextTick, ref, watch } from 'vue'
 import { AGENT_BY_ID } from '../../config/agents'
 import type { AgentMode, FileAttachment } from '../../types/agent'
+import type { FileInfo } from '../../types/api'
 import AgentModeSelector from './AgentModeSelector.vue'
 import FileAttachmentBar from './FileAttachmentBar.vue'
+import FilePickerMenu from './FilePickerMenu.vue'
 
 const props = defineProps<{
   modelValue: string
@@ -21,12 +23,12 @@ const emit = defineEmits<{
   send: []
   stop: []
   file: [file: File]
+  selectFile: [file: FileInfo]
   removeFile: []
   retryFile: []
 }>()
 
 const textarea = ref<HTMLTextAreaElement | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
 const composing = ref(false)
 
@@ -40,7 +42,8 @@ const canSend = computed(() => {
     props.attachment?.status === 'uploading' ||
     props.attachment?.status === 'processing'
   ) return false
-  return props.modelValue.trim().length > 0 || (props.mode === 'file' && props.attachment?.status === 'ready')
+  if (props.mode === 'file') return props.attachment?.status === 'ready'
+  return props.modelValue.trim().length > 0
 })
 
 function resize() {
@@ -126,27 +129,13 @@ defineExpose({ focus: () => textarea.value?.focus() })
 
       <div class="flex min-w-0 items-end justify-between gap-2 px-2.5 pb-2">
         <div class="flex min-w-0 flex-1 items-center gap-1">
-          <input
+          <FilePickerMenu
             v-if="fileEnabled"
-            ref="fileInput"
-            class="sr-only"
-            type="file"
-            name="file"
-            accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg"
-            aria-label="Choose a file"
-            @change="acceptFile(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''"
-          />
-          <button
-            v-if="fileEnabled"
-            type="button"
-            class="relative inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-[var(--ink-faint)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] disabled:opacity-40 sm:size-8"
-            aria-label="Attach file"
             :disabled="streaming || attachment?.status === 'uploading' || attachment?.status === 'processing'"
-            @click="fileInput?.click()"
-          >
-            <span class="absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true" />
-            <Paperclip class="size-4" aria-hidden="true" />
-          </button>
+            :current-file-id="attachment?.fileId"
+            @file="acceptFile"
+            @select="emit('selectFile', $event)"
+          />
           <AgentModeSelector
             v-if="!hideModeSelector"
             :model-value="mode"
