@@ -1,6 +1,6 @@
 export type AgentMode = 'chat' | 'file' | 'skills' | 'research' | 'ppt'
 export type MessageState = 'streaming' | 'complete' | 'error' | 'stopped'
-export type ToolStatus = 'running' | 'complete'
+export type ToolStatus = 'running' | 'complete' | 'error'
 
 export interface SourceReference {
   url: string

@@ -170,6 +170,22 @@ Inspect the code and report risks.
     asyncio.run(scenario())
 
 
+def test_bundled_workspace_inspector_skill_is_discoverable() -> None:
+    async def scenario() -> None:
+        bundled_skills = Path(__file__).resolve().parents[1] / "skills"
+        registry = SkillRegistry([bundled_skills])
+
+        assert [skill.name for skill in registry.list_all()] == ["workspace-inspector"]
+
+        result = json.loads(await ReadSkillTool(registry).call(json.dumps({"skill": "workspace-inspector"})))
+        assert result["success"] is True
+        assert "# Workspace Inspector" in result["content"]
+        assert "list_files" in result["content"]
+        assert "grep" in result["content"]
+
+    asyncio.run(scenario())
+
+
 def test_restricted_bash_defaults_disabled_and_never_spawns_shell_metacharacters(tmp_path: Path) -> None:
     async def scenario() -> None:
         root = tmp_path / "workspace"

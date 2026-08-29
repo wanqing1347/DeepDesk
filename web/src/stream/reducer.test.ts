@@ -117,6 +117,33 @@ describe('reduceAgentEvent', () => {
     expect(target.tools.map((tool) => tool.status)).toEqual(['complete', 'complete'])
   })
 
+  it('marks failed tool results as tool errors without changing timeline order', () => {
+    const target = message()
+
+    reduceAgentEvent(target, {
+      type: 'tool_start',
+      toolName: 'bash',
+      toolCallId: 'call-bash',
+      arguments: '{"command":"python -c pass"}',
+    })
+    reduceAgentEvent(target, {
+      type: 'tool_end',
+      toolName: 'bash',
+      toolCallId: 'call-bash',
+      result: 'Error: 命令不在允许列表',
+    })
+
+    expect(target.tools).toEqual([
+      {
+        id: 'call-bash',
+        toolName: 'bash',
+        status: 'error',
+        arguments: '{"command":"python -c pass"}',
+        result: 'Error: 命令不在允许列表',
+      },
+    ])
+  })
+
   it('marks a terminal error with no answer as error on complete', () => {
     const target = message()
 

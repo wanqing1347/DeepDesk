@@ -26,9 +26,15 @@ function retryRunning(error: StreamError): boolean {
       <summary class="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md focus-visible:outline-offset-1 sm:min-h-8">
         <span class="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
           <LoaderCircle v-if="tool.status === 'running'" class="size-3.5 animate-spin text-[var(--accent)]" />
+          <CircleAlert v-else-if="tool.status === 'error'" class="size-3.5 text-[var(--danger)]" />
           <Check v-else class="size-3.5 text-[var(--accent)]" />
         </span>
-        <span class="min-w-0 flex-1 truncate" :title="tool.toolName">{{ toolLabel(tool.toolName) }}</span>
+        <span
+          class="min-w-0 flex-1 truncate"
+          :class="tool.status === 'error' ? 'text-[var(--danger)]' : ''"
+          :title="tool.toolName"
+        >{{ toolLabel(tool.toolName) }}</span>
+        <span v-if="tool.status === 'error'" class="shrink-0 text-xs font-medium text-[var(--danger)]">Failed</span>
         <ChevronDown
           v-if="tool.arguments !== undefined || tool.result !== undefined"
           class="size-3.5 text-[var(--ink-faint)] transition-transform group-open:rotate-180"

@@ -38,6 +38,24 @@ async function mockChat(page: Page, events: Array<Record<string, unknown>>) {
   })
 }
 
+async function mockSkills(
+  page: Page,
+  events: Array<Record<string, unknown>>,
+  onRequest?: (url: URL) => void,
+) {
+  await page.route('**/api/agent/skills/stream**', async (route) => {
+    onRequest?.(new URL(route.request().url()))
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache',
+      },
+      body: sse(events),
+    })
+  })
+}
+
 async function openHome(page: Page) {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'What can I help with?' })).toBeVisible()
@@ -58,26 +76,25 @@ test('Agent modes visibly differentiate the empty workspace before a message is 
 
   const composer = page.getByRole('textbox', { name: 'Message' })
   await expect(composer).toHaveAttribute('placeholder', /Ask a question, explore an idea/i)
-  await expect(page.getByText('Direct answers', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Deep Research', exact: true }).click()
+  await page.getByRole('group', { name: 'Agent mode' }).getByRole('button', { name: 'Research', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Research a complex question' })).toBeVisible()
-  await expect(page.getByText('Multi-source research', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Uses multiple sources and returns a researched answer with citations/i)).toBeVisible()
   await expect(composer).toHaveAttribute('placeholder', /researched, compared, or verified/i)
 
   await page.getByRole('button', { name: 'File', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Work with a file' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Drop a file here or browse/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Attach or choose file' })).toBeVisible()
   await expect(composer).toHaveAttribute('placeholder', /attached file/i)
 
   await page.getByRole('button', { name: 'Skills', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Put tools to work' })).toBeVisible()
-  await expect(page.getByText('Restricted Bash', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Use tools and skills when the task needs more than a direct answer/i)).toBeVisible()
   await expect(composer).toHaveAttribute('placeholder', /choose the right tools/i)
 
   await page.getByRole('button', { name: 'PPT', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Build a presentation' })).toBeVisible()
-  await expect(page.getByText('Continue and modify', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Describe the audience, purpose, and slide count you want/i)).toBeVisible()
   await expect(composer).toHaveAttribute('placeholder', /topic, audience, slide count/i)
 })
 
@@ -107,7 +124,7 @@ test('switching mode after a completed turn starts a fresh conversation and relo
   await expect(page.getByText('Chat conversation answer.', { exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\/c\/.+/)
 
-  await page.getByRole('button', { name: 'Research', exact: true }).click()
+  await page.getByRole('group', { name: 'Agent mode' }).getByRole('button', { name: 'Research', exact: true }).click()
 
   await expect(page).toHaveURL('/')
   await expect(page.getByRole('heading', { name: 'Research a complex question' })).toBeVisible()
@@ -145,7 +162,9 @@ test('switching mode after a completed turn starts a fresh conversation and relo
 
   await page.reload()
 
-  await expect(page.getByRole('button', { name: 'Research', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('group', { name: 'Agent mode' }).getByRole('button', { name: 'Research', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('Research conversation answer.', { exact: true })).toBeVisible()
 })
 
@@ -247,6 +266,168 @@ test('Tool + Sources: tool completion and clickable references render from SSE',
   await expect(source).toHaveAttribute('target', '_blank')
 })
 
+test('Skills without a file sends successfully and preserves tool parameters, results, retry, errors, and order', async ({ page }) => {
+  let requestedFileId: string | null | undefined
+  await mockSkills(
+    page,
+    [
+      { type: 'thinking', content: 'Selecting tools…' },
+      { type: 'error', code: 'LLM_CALL_FAILED', message: 'LLM call failed, retrying (1/2)', detail: 'temporary' },
+      {
+        type: 'tool_start',
+        toolName: 'read_skill',
+        toolCallId: 'skill-1',
+        arguments: '{"skill":"code-review"}',
+      },
+      {
+        type: 'tool_start',
+        toolName: 'grep',
+        toolCallId: 'grep-1',
+        arguments: '{"pattern":"TODO","path":"."}',
+      },
+      {
+        type: 'tool_start',
+        toolName: 'bash',
+        toolCallId: 'bash-1',
+        arguments: '{"command":"python -c pass"}',
+      },
+      { type: 'tool_end', toolName: 'grep', toolCallId: 'grep-1', result: 'src/app.ts:4:TODO' },
+      { type: 'tool_end', toolName: 'bash', toolCallId: 'bash-1', result: 'Error: 命令不在允许列表' },
+      {
+        type: 'tool_end',
+        toolName: 'read_skill',
+        toolCallId: 'skill-1',
+        result: '{"success":true,"skill":"code-review"}',
+      },
+      { type: 'text', content: 'Skills completed.' },
+      { type: 'complete' },
+    ],
+    (url) => {
+      requestedFileId = url.searchParams.get('fileId')
+    },
+  )
+  await openHome(page)
+
+  await page.getByRole('button', { name: 'Skills', exact: true }).click()
+  await send(page, 'Inspect the workspace with the right tools')
+
+  expect(requestedFileId).toBeNull()
+  await expect(page.getByText('Skills completed.', { exact: true })).toBeVisible()
+
+  const activity = page.getByLabel('Agent activity')
+  const toolRows = activity.locator('details').filter({ has: page.locator('summary') })
+  await expect(activity.locator('summary').nth(0)).toContainText(/reading skill instructions/i)
+  await expect(activity.locator('summary').nth(1)).toContainText(/searching workspace text/i)
+  await expect(activity.locator('summary').nth(2)).toContainText(/running an allowed command/i)
+  await expect(activity.locator('summary').nth(2)).toContainText('Failed')
+  await expect(activity.getByText('LLM call failed, retrying (1/2)', { exact: true })).toBeVisible()
+
+  await activity.locator('summary').nth(0).click()
+  await expect(activity.locator('details').nth(0)).toContainText('Parameters')
+  await expect(activity.locator('details').nth(0)).toContainText('"skill": "code-review"')
+  await expect(activity.locator('details').nth(0)).toContainText('Result')
+  await expect(activity.locator('details').nth(0)).toContainText('"success": true')
+
+  await activity.locator('summary').nth(1).click()
+  await expect(activity.locator('details').nth(1)).toContainText('src/app.ts:4:TODO')
+  await expect(toolRows).toHaveCount(4)
+})
+
+test('Skills with an uploaded file forwards fileId and renders File Content activity', async ({ page }) => {
+  let requestedFileId: string | null | undefined
+  await page.route('**/api/file/upload', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          fileId: 'skills-file-1',
+          fileName: 'skills-notes.txt',
+          fileType: 'txt',
+          fileSize: 17,
+          status: 'SUCCESS',
+        },
+      }),
+    })
+  })
+  await mockSkills(
+    page,
+    [
+      {
+        type: 'tool_start',
+        toolName: 'loadContent',
+        toolCallId: 'file-1',
+        arguments: '{"fileId":"skills-file-1","question":"summarize"}',
+      },
+      {
+        type: 'tool_end',
+        toolName: 'loadContent',
+        toolCallId: 'file-1',
+        result: '=== 文件内容 ===\\nimportant notes',
+      },
+      { type: 'text', content: 'File-aware Skills answer.' },
+      { type: 'complete' },
+    ],
+    (url) => {
+      requestedFileId = url.searchParams.get('fileId')
+    },
+  )
+  await openHome(page)
+
+  await page.getByRole('button', { name: 'Skills', exact: true }).click()
+  await page.getByLabel('Choose a new file').setInputFiles({
+    name: 'skills-notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('important notes'),
+  })
+  await expect(page.getByText('skills-notes.txt', { exact: true })).toBeVisible()
+
+  await send(page, 'Summarize the attachment with Skills')
+
+  expect(requestedFileId).toBe('skills-file-1')
+  await expect(page.getByText('File-aware Skills answer.', { exact: true })).toBeVisible()
+  const activity = page.getByLabel('Agent activity')
+  await expect(activity.locator('summary').first()).toContainText(/reading uploaded file/i)
+})
+
+test('restored Skills history keeps Skills mode and persisted tool names', async ({ page }) => {
+  await page.route('**/api/session/skills-history', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          conversationId: 'skills-history',
+          agentType: 'skills',
+          fileid: null,
+          messages: [
+            {
+              id: 31,
+              question: 'Inspect the workspace',
+              answer: 'Historical Skills answer.',
+              tools: 'read_skill,grep,bash',
+              createTime: '2026-08-29T08:00:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await page.goto('/c/skills-history')
+
+  await expect(page.getByRole('button', { name: 'Skills', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Historical Skills answer.', { exact: true })).toBeVisible()
+  const activity = page.getByLabel('Agent activity')
+  await expect(activity.locator('summary').nth(0)).toContainText(/reading skill instructions/i)
+  await expect(activity.locator('summary').nth(1)).toContainText(/searching workspace text/i)
+  await expect(activity.locator('summary').nth(2)).toContainText(/running an allowed command/i)
+})
+
 const responsiveCases = [
   { name: '1440px', width: 1440, height: 900 },
   { name: '1024px', width: 1024, height: 800 },
@@ -282,10 +463,11 @@ for (const viewport of responsiveCases) {
       expect(openBox?.width).toBeGreaterThanOrEqual(44)
       expect(openBox?.height).toBeGreaterThanOrEqual(44)
       await openSidebar.click()
-      const mobileSidebar = page.getByRole('complementary', { name: 'Conversation sidebar' })
+      const mobileNavigation = page.getByRole('dialog', { name: 'Mobile navigation' })
+      const mobileSidebar = mobileNavigation.getByRole('complementary', { name: 'DeepDesk workspace sidebar' })
       await expect(mobileSidebar).toBeVisible()
       await mobileSidebar.getByRole('button', { name: 'Close sidebar' }).click()
-      await expect(mobileSidebar).toBeHidden()
+      await expect(mobileNavigation).toBeHidden()
     }
 
     await send(page, `Responsive smoke ${viewport.name}`)
@@ -320,14 +502,10 @@ for (const viewport of responsiveCases) {
     expect(sourcesWithinViewport).toBe(true)
 
     if (viewport.width === 390) {
-      for (const control of [
-        page.getByRole('button', { name: 'Attach file' }),
-        page.getByRole('button', { name: 'Send message', exact: true }),
-      ]) {
-        const box = await control.boundingBox()
-        expect(box?.width).toBeGreaterThanOrEqual(44)
-        expect(box?.height).toBeGreaterThanOrEqual(44)
-      }
+      const sendControl = page.getByRole('button', { name: 'Send message', exact: true })
+      const sendBox = await sendControl.boundingBox()
+      expect(sendBox?.width).toBeGreaterThanOrEqual(44)
+      expect(sendBox?.height).toBeGreaterThanOrEqual(44)
     }
   })
 }

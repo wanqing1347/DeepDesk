@@ -43,6 +43,7 @@ describe('conversation store', () => {
   it.each([
     ['plan-execute', 'research'],
     ['pptx', 'ppt'],
+    ['skills', 'skills'],
   ] as const)('restores %s history as %s mode', (agentType, expectedMode) => {
     const store = useConversationStore()
     store.load({
@@ -55,6 +56,33 @@ describe('conversation store', () => {
     expect(store.current?.messages[1]).toMatchObject({
       role: 'assistant',
       agentMode: expectedMode,
+    })
+  })
+
+  it('restores persisted Skills tool names in their original order', () => {
+    const store = useConversationStore()
+    store.load({
+      conversationId: 'conversation-skills-history',
+      agentType: 'skills',
+      messages: [
+        {
+          id: 12,
+          question: 'Inspect the workspace',
+          answer: 'Done.',
+          tools: 'read_skill,grep,bash',
+        },
+      ],
+    })
+
+    expect(store.current?.mode).toBe('skills')
+    expect(store.current?.messages[1]).toMatchObject({
+      role: 'assistant',
+      agentMode: 'skills',
+      tools: [
+        { toolName: 'read_skill', status: 'complete' },
+        { toolName: 'grep', status: 'complete' },
+        { toolName: 'bash', status: 'complete' },
+      ],
     })
   })
 
@@ -80,9 +108,9 @@ describe('conversation store', () => {
     expect(store.isStreaming).toBe(true)
   })
 
-  it('keeps the original file id when retrying a file request', () => {
+  it.each(['file', 'skills'] as const)('keeps the original file id when retrying a %s request', (mode) => {
     const store = useConversationStore()
-    store.create('file', 'conversation-file')
+    store.create(mode, `conversation-${mode}`)
     store.setAttachment({
       fileId: 'file-123',
       name: 'notes.pdf',
@@ -94,7 +122,7 @@ describe('conversation store', () => {
 
     const retry = store.prepareRetry(assistant.id)
 
-    expect(retry?.mode).toBe('file')
+    expect(retry?.mode).toBe(mode)
     expect(retry?.fileId).toBe('file-123')
   })
 

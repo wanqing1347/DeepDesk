@@ -20,6 +20,24 @@ function parseJson(value: unknown): unknown {
   }
 }
 
+function toolResultFailed(value: unknown): boolean {
+  const parsed = parseJson(value)
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>
+    if (record.success === false) return true
+    if (record.error && record.success !== true) return true
+    return false
+  }
+  if (typeof parsed !== 'string') return false
+  const normalized = parsed.trim().toLowerCase()
+  return (
+    normalized.startsWith('error:') ||
+    normalized.startsWith('工具执行失败') ||
+    normalized.startsWith('工具未找到') ||
+    normalized.includes('restricted bash is disabled')
+  )
+}
+
 function unwrapReferencePayload(value: unknown): unknown {
   let current = parseJson(value)
   if (current && typeof current === 'object' && !Array.isArray(current)) {
@@ -111,14 +129,15 @@ export function reduceAgentEvent(message: AssistantMessage, event: AgentEvent): 
     case 'tool_end': {
       const id = event.toolCallId || `${event.toolName || 'tool'}-${message.tools.length}`
       const existing = message.tools.find((tool) => tool.id === id)
+      const status = toolResultFailed(event.result) ? 'error' : 'complete'
       if (existing) {
-        existing.status = 'complete'
+        existing.status = status
         existing.result = event.result
       } else {
         message.tools.push({
           id,
           toolName: event.toolName || 'unknown',
-          status: 'complete',
+          status,
           result: event.result,
         })
       }
