@@ -83,7 +83,16 @@ Vite 本地开发默认通过 `/api` 代理后端 `http://127.0.0.1:8888`。
 
 ### 3. Full-stack 持久化模式
 
-Workspace Library（Session、File、Presentation）需要数据库模式。仓库提供独立的本地基础设施配置，不会覆盖现有 `backend/.env`：
+Workspace Library（Session、File、Presentation）需要数据库模式。Windows 本地开发推荐直接使用一键启动脚本：
+
+```powershell
+Set-Location D:\hollisagent\LLMentor-master\DeepDesk
+.\start-fullstack.ps1
+```
+
+脚本会检查 Docker Desktop、启动 MySQL / PgVector / MinIO、等待依赖就绪、执行 Alembic migration，并分别启动后端和前端；默认还会打开 `http://127.0.0.1:5173`。不希望自动打开浏览器时可运行 `.\start-fullstack.ps1 -NoBrowser`。
+
+仓库同时提供独立的本地基础设施配置，不会覆盖现有 `backend/.env`：
 
 ```powershell
 Set-Location D:\hollisagent\LLMentor-master\DeepDesk
