@@ -30,6 +30,7 @@ const props = defineProps<{
   mobile?: boolean
   loading?: boolean
   error?: string
+  activeWorkspace?: WorkspaceSection
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +41,7 @@ const emit = defineEmits<{
   settings: []
   close: []
   retry: []
+  workspace: [section: WorkspaceSection]
 }>()
 
 interface SessionGroup {
@@ -47,7 +49,8 @@ interface SessionGroup {
   items: SessionListItem[]
 }
 
-const workspaceSection = ref<WorkspaceSection>('chats')
+const workspaceSection = ref<WorkspaceSection>(props.activeWorkspace || 'chats')
+const selectedWorkspace = computed(() => props.activeWorkspace || workspaceSection.value)
 const searchOpen = ref(false)
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -70,7 +73,7 @@ const sectionLabels: Record<WorkspaceSection, string> = {
 }
 
 const filteredSessions = computed(() =>
-  filterWorkspaceSessions(props.sessions, workspaceSection.value, searchQuery.value),
+  filterWorkspaceSessions(props.sessions, selectedWorkspace.value, searchQuery.value),
 )
 
 const groups = computed<SessionGroup[]>(() => {
@@ -116,8 +119,9 @@ function startNewChat() {
 }
 
 function selectWorkspace(section: WorkspaceSection) {
-  workspaceSection.value = section
+  if (!props.activeWorkspace) workspaceSection.value = section
   searchQuery.value = ''
+  emit('workspace', section)
 }
 
 async function openSearch() {
@@ -133,9 +137,16 @@ function closeSearch() {
 }
 
 watch(
+  () => props.activeWorkspace,
+  (section) => {
+    if (section) workspaceSection.value = section
+  },
+)
+
+watch(
   () => [props.currentId, props.sessions] as const,
   ([currentId, sessions]) => {
-    if (!currentId || currentId === lastSyncedConversationId) return
+    if (props.activeWorkspace || !currentId || currentId === lastSyncedConversationId) return
     const currentSession = sessions.find((session) => session.conversationId === currentId)
     if (!currentSession) return
     workspaceSection.value = workspaceSectionForSession(currentSession)
@@ -242,16 +253,16 @@ watch(
           class="relative flex h-12 w-full items-center gap-2 rounded-lg px-2.5 text-left text-base text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] md:h-9 md:text-sm"
           :class="[
             collapsed && !mobile ? 'justify-center px-0' : '',
-            workspaceSection === item.id ? 'bg-[var(--accent-soft)] text-[var(--ink)]' : '',
+            selectedWorkspace === item.id ? 'bg-[var(--accent-soft)] text-[var(--ink)]' : '',
           ]"
-          :aria-pressed="workspaceSection === item.id"
+          :aria-pressed="selectedWorkspace === item.id"
           :aria-label="collapsed && !mobile ? item.label : undefined"
           @click="selectWorkspace(item.id)"
         >
           <component
             :is="item.icon"
             class="size-4 shrink-0"
-            :class="workspaceSection === item.id ? 'text-[var(--accent)]' : 'text-[var(--ink-faint)]'"
+            :class="selectedWorkspace === item.id ? 'text-[var(--accent)]' : 'text-[var(--ink-faint)]'"
             aria-hidden="true"
           />
           <span v-if="!collapsed || mobile" class="truncate">{{ item.label }}</span>
@@ -294,8 +305,8 @@ watch(
         v-else-if="!filteredSessions.length"
         class="px-2 py-3 text-xs leading-5 text-[var(--ink-faint)]"
       >
-        <template v-if="searchQuery">No matching {{ sectionLabels[workspaceSection] }} conversations.</template>
-        <template v-else>No recent {{ sectionLabels[workspaceSection] }} conversations.</template>
+        <template v-if="searchQuery">No matching {{ sectionLabels[selectedWorkspace] }} conversations.</template>
+        <template v-else>No recent {{ sectionLabels[selectedWorkspace] }} conversations.</template>
       </div>
       <template v-for="group in groups" v-else :key="group.label">
         <div class="mb-1 mt-3.5 px-2 text-[0.6875rem] font-medium tracking-[0.01em] text-[var(--ink-faint)] first:mt-1">{{ group.label }}</div>

@@ -12,6 +12,7 @@ import AgentEmptyState from '../components/chat/AgentEmptyState.vue'
 import MessageList from '../components/chat/MessageList.vue'
 import SettingsDialog from '../components/layout/SettingsDialog.vue'
 import SidebarNav from '../components/layout/SidebarNav.vue'
+import type { WorkspaceSection } from '../components/layout/workspaceNavigation'
 import { AGENT_BY_ID } from '../config/agents'
 import { useAgentStream } from '../composables/useAgentStream'
 import { useConversationStore } from '../stores/conversation'
@@ -200,6 +201,11 @@ async function newChat() {
   conversation.create('chat')
   settings.setMobileSidebar(false)
   if (route.path !== '/') await router.push('/')
+}
+
+async function openWorkspace(section: WorkspaceSection) {
+  settings.setMobileSidebar(false)
+  if (section === 'research' && route.path !== '/research') await router.push('/research')
 }
 
 async function selectSession(id: string) {
@@ -525,6 +531,7 @@ onMounted(() => void sessions.load())
         @toggle="settings.toggleSidebar()"
         @settings="openSettings()"
         @retry="sessions.load"
+        @workspace="openWorkspace"
       />
     </div>
 
@@ -550,6 +557,7 @@ onMounted(() => void sessions.load())
             @settings="openSettings(true)"
             @close="settings.setMobileSidebar(false)"
             @retry="sessions.load"
+            @workspace="openWorkspace"
           />
         </div>
       </dialog>

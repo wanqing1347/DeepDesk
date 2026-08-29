@@ -428,6 +428,134 @@ test('restored Skills history keeps Skills mode and persisted tool names', async
   await expect(activity.locator('summary').nth(2)).toContainText(/running an allowed command/i)
 })
 
+test('Research history is a real workspace route and restores final report with sources', async ({ page }) => {
+  await page.route('**/api/session/list**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          pageNum: 1,
+          pageSize: 100,
+          total: 4,
+          records: [
+            {
+              conversationId: 'chat-history',
+              agentType: 'websearch',
+              question: 'General chat history',
+              answer: 'Chat answer',
+              updateTime: '2026-08-29T08:00:00',
+            },
+            {
+              conversationId: 'research-history-1',
+              agentType: 'plan-execute',
+              question: 'Compare agent memory strategies',
+              answer: '# Research report',
+              updateTime: '2026-08-29T09:15:00',
+            },
+            {
+              conversationId: 'research-history-2',
+              agentType: 'plan-execute',
+              question: 'Investigate evaluation frameworks',
+              answer: null,
+              updateTime: '2026-08-29T09:00:00',
+            },
+            {
+              conversationId: 'ppt-history',
+              agentType: 'pptx',
+              question: 'Build a presentation',
+              answer: 'Deck ready',
+              updateTime: '2026-08-29T07:30:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await page.route('**/api/session/research-history-1', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          conversationId: 'research-history-1',
+          agentType: 'plan-execute',
+          fileid: null,
+          messages: [
+            {
+              id: 51,
+              question: 'Compare agent memory strategies',
+              answer: '# Research report\n\nLong-term memory should be evaluated against retrieval quality.',
+              thinking: 'Research plan complete.',
+              reference: JSON.stringify({
+                type: 'reference',
+                content: JSON.stringify([
+                  {
+                    title: 'Memory systems paper',
+                    url: 'https://example.com/memory-paper',
+                    content: 'Primary research source',
+                  },
+                  {
+                    title: 'Evaluation guide',
+                    url: 'https://example.org/evaluation-guide',
+                    content: 'Evaluation criteria',
+                  },
+                ]),
+                count: 2,
+              }),
+              createTime: '2026-08-29T09:15:00',
+            },
+          ],
+        },
+      }),
+    })
+  })
+
+  await openHome(page)
+  const workspace = page.getByRole('navigation', { name: 'Workspace' })
+  await workspace.getByRole('button', { name: 'Research', exact: true }).click()
+
+  await expect(page).toHaveURL('/research')
+  await expect(page.getByRole('heading', { name: 'Research history' })).toBeVisible()
+  const memoryResearch = page.getByRole('button', { name: 'Open research: Compare agent memory strategies' })
+  const evaluationResearch = page.getByRole('button', { name: 'Open research: Investigate evaluation frameworks' })
+  await expect(memoryResearch).toBeVisible()
+  await expect(evaluationResearch).toBeVisible()
+  await expect(page.getByText('General chat history', { exact: true })).toBeHidden()
+  await expect(page.getByText('Build a presentation', { exact: true })).toBeHidden()
+  await expect(page.getByText('Complete', { exact: true })).toBeVisible()
+  await expect(page.getByText('In progress', { exact: true })).toBeVisible()
+
+  const search = page.getByRole('searchbox', { name: 'Search research history' })
+  await search.fill('evaluation')
+  await expect(evaluationResearch).toBeVisible()
+  await expect(memoryResearch).toBeHidden()
+  await search.fill('')
+
+  await memoryResearch.click()
+
+  await expect(page).toHaveURL('/c/research-history-1')
+  await expect(
+    page.getByRole('group', { name: 'Agent mode' }).getByRole('button', { name: 'Research', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Final report', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Research report' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Memory systems paper/i })).toHaveAttribute(
+    'href',
+    'https://example.com/memory-paper',
+  )
+  await expect(page.getByRole('link', { name: /Evaluation guide/i })).toHaveAttribute(
+    'href',
+    'https://example.org/evaluation-guide',
+  )
+})
+
 const responsiveCases = [
   { name: '1440px', width: 1440, height: 900 },
   { name: '1024px', width: 1024, height: 800 },
