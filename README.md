@@ -81,6 +81,36 @@ npm run dev
 
 Vite 本地开发默认通过 `/api` 代理后端 `http://127.0.0.1:8888`。
 
+### 3. Full-stack 持久化模式
+
+Workspace Library（Session、File、Presentation）需要数据库模式。仓库提供独立的本地基础设施配置，不会覆盖现有 `backend/.env`：
+
+```powershell
+Set-Location D:\hollisagent\LLMentor-master\DeepDesk
+docker compose -f docker-compose.fullstack.yml up -d
+
+Set-Location backend
+$env:PERSISTENCE_MODE="database"
+$env:DATABASE_URL="mysql+pymysql://deepdesk:deepdesk_dev@127.0.0.1:3307/deepdesk?charset=utf8mb4"
+$env:MINIO_ENDPOINT="http://127.0.0.1:9000"
+$env:MINIO_ACCESS_KEY="deepdesk"
+$env:MINIO_SECRET_KEY="deepdesk_dev_secret"
+$env:MINIO_BUCKET="rag-test2"
+$env:MINIO_PUBLIC_READ="true"
+$env:VECTOR_DATABASE_URL="postgresql+psycopg://deepdesk:deepdesk_dev@127.0.0.1:5434/deepdesk_vectors"
+python -m alembic upgrade head
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8888
+```
+
+这些凭据只用于本地 Docker 开发。完整变量片段见 `backend/.env.fullstack.example`。
+
+可用不调用 LLM 的持久化验收测试验证 App 重建后资产仍然存在：
+
+```powershell
+$env:RUN_WORKSPACE_PERSISTENCE_INTEGRATION="1"
+python -m pytest -q tests/test_workspace_persistence_integration.py
+```
+
 ## 质量检查
 
 Backend：

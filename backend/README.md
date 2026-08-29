@@ -55,6 +55,12 @@
 - `GET /session/{conversation_id}`
 - `DELETE /session/{conversation_id}`
 
+PPT 资产：
+
+- `GET /ppt/list`
+- `GET /ppt/{ppt_id}`
+- `DELETE /ppt/{ppt_id}`
+
 任务：
 
 - `GET /agent/stop`
@@ -168,6 +174,8 @@ DATABASE_URL=
 
 - `memory`：适合本地 Agent 演示和单元测试。
 - `database`：启用 MySQL-backed session/file/PPT persistence。
+
+本地完整 Workspace 验收可使用仓库根目录的 `docker-compose.fullstack.yml`，其开发变量片段位于 `.env.fullstack.example`。该配置提供 MySQL、PgVector 与 MinIO，`TASK_MANAGER_MODE` 仍可保持 `local`。
 
 数据库模式下可通过 Alembic 初始化：
 
@@ -325,6 +333,13 @@ git diff --check
 ```
 
 默认测试使用 fake/mock provider 隔离外部网络。真实 Redis、MinIO、PgVector 和 provider 验收通过显式 integration/smoke 测试单独执行。
+
+Workspace 持久化重启验收不调用 LLM；配置真实 `DATABASE_URL` 和 MinIO 后运行：
+
+```powershell
+$env:RUN_WORKSPACE_PERSISTENCE_INTEGRATION="1"
+python -m pytest -q tests/test_workspace_persistence_integration.py
+```
 
 ## 当前状态
 

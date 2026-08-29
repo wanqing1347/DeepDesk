@@ -1,0 +1,57 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: deepdesk-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: deepdesk
+      MYSQL_USER: deepdesk
+      MYSQL_PASSWORD: deepdesk_dev
+      MYSQL_ROOT_PASSWORD: deepdesk_root_dev
+    ports:
+      - "3307:3306"
+    volumes:
+      - deepdesk_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: deepdesk-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: deepdesk_vectors
+      POSTGRES_USER: deepdesk
+      POSTGRES_PASSWORD: deepdesk_dev
+    ports:
+      - "5434:5432"
+    volumes:
+      - deepdesk_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepdesk -d deepdesk_vectors"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: deepdesk-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: deepdesk
+      MINIO_ROOT_PASSWORD: deepdesk_dev_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - deepdesk_minio_data:/data
+
+volumes:
+  deepdesk_mysql_data:
+  deepdesk_pgvector_data:
+  deepdesk_minio_data:
